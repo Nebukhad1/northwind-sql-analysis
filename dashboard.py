@@ -1,0 +1,159 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+
+# ==========================================
+# 1. PAGE CONFIGURATION
+# ==========================================
+st.set_page_config(
+    page_title="Northwind Sales Analytics",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f8f9fa;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 2. DATA LOADING FUNCTION (CACHING)
+# ==========================================
+@st.cache_data
+def load_data():
+    # Tambahkan encoding='latin1' di setiap read_csv
+    df_rev = pd.read_csv('hasil_csv/01_revenue_trend.csv', encoding='latin1')
+    df_top_cust = pd.read_csv('hasil_csv/02_top_customers.csv', encoding='latin1')
+    df_region = pd.read_csv('hasil_csv/03_revenue_by_region.csv', encoding='latin1')
+    df_emp = pd.read_csv('hasil_csv/08_employee_performance.csv', encoding='latin1')
+    df_inactive = pd.read_csv('hasil_csv/09_inactive_customers.csv', encoding='latin1')
+    return df_rev, df_top_cust, df_region, df_emp, df_inactive
+
+try:
+    df_rev, df_top_cust, df_region, df_emp, df_inactive = load_data()
+except FileNotFoundError:
+    st.error("⚠️ CSV files not found. Please ensure the 'hasil_csv' folder and its contents are correctly placed.")
+    st.stop()
+
+# ==========================================
+# 3. SIDEBAR (NAVIGATION)
+# ==========================================
+with st.sidebar:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Postgresql_elephant.svg/1200px-Postgresql_elephant.svg.png", width=100)
+    st.title("Navigation")
+    menu = st.radio(
+        "Select Analysis:",
+        ["📈 Revenue Trend", "🏆 Top Customers", "🌍 Revenue by Region", "🧑‍💼 Employee Performance", "🚨 Inactive Customers"]
+    )
+    st.markdown("---")
+    st.info("Created by **Muhammad Nebukhadnezar**\n\nTech Stack: PostgreSQL, Python, Streamlit")
+
+# ==========================================
+# 4. MAIN HEADER & METRICS
+# ==========================================
+st.title("📊 Northwind Sales Analytics Dashboard")
+st.markdown("This interactive dashboard is built based on SQL analysis of the Northwind database.")
+
+# Display 3 Key Metrics (Summary)
+total_revenue = df_rev['total_revenue'].sum()
+total_customers = len(df_top_cust)
+total_employees = len(df_emp)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric(label="💰 Total Revenue (1996-1998)", value=f"${total_revenue:,.2f}")
+with col2:
+    st.metric(label="🏆 Top 10 Customers", value=f"{total_customers} Companies")
+with col3:
+    st.metric(label="🚨 Inactive Customers", value=f"{len(df_inactive)} Customers")
+
+st.markdown("---")
+
+# ==========================================
+# 5. CONTENT BASED ON MENU SELECTION
+# ==========================================
+
+# --- MENU 1: REVENUE TREND ---
+if menu == "📈 Revenue Trend":
+    st.subheader("Monthly Revenue Trend")
+    st.write("This chart shows the revenue fluctuation over time.")
+    
+    # Line Chart
+    fig_line = px.line(
+        df_rev, x='bulan', y='total_revenue',
+        labels={'bulan': 'Month', 'total_revenue': 'Total Revenue ($)'},
+        markers=True,
+        title="Revenue per Month"
+    )
+    fig_line.update_layout(hovermode="x unified")
+    st.plotly_chart(fig_line, use_container_width=True)
+    
+    # Data Table
+    with st.expander("View Raw Data (Table)"):
+        st.dataframe(df_rev, use_container_width=True)
+
+# --- MENU 2: TOP CUSTOMERS ---
+elif menu == "🏆 Top Customers":
+    st.subheader("Top 10 Customers by Lifetime Value")
+    st.write("This analysis helps the marketing team prioritize VIP clients.")
+    
+    # Horizontal Bar Chart
+    fig_bar = px.bar(
+        df_top_cust, x='lifetime_value', y='company_name',
+        orientation='h',
+        labels={'lifetime_value': 'Lifetime Value ($)', 'company_name': 'Company Name'},
+        color='lifetime_value', color_continuous_scale='Blues',
+        title="Top 10 Customers by Lifetime Value"
+    )
+    fig_bar.update_layout(yaxis={'categoryorder':'total ascending'})
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+# --- MENU 3: REVENUE BY REGION ---
+elif menu == "🌍 Revenue by Region":
+    st.subheader("Revenue Distribution by Country")
+    st.write("Identify which international markets are most profitable.")
+    
+    # Vertical Bar Chart
+    fig_region = px.bar(
+        df_region, x='ship_country', y='revenue',
+        labels={'ship_country': 'Country', 'revenue': 'Total Revenue ($)'},
+        color='revenue', color_continuous_scale='Teal',
+        title="Revenue by Country (Top 10)"
+    )
+    st.plotly_chart(fig_region, use_container_width=True)
+
+# --- MENU 4: EMPLOYEE PERFORMANCE ---
+elif menu == "🧑‍💼 Employee Performance":
+    st.subheader("Sales Representative Performance")
+    st.write("Compare the total revenue generated by each employee.")
+    
+    col_chart, col_table = st.columns([2, 1])
+    
+    with col_chart:
+        # Bar Chart
+        fig_emp = px.bar(
+            df_emp, x='employee', y='total_revenue',
+            labels={'total_revenue': 'Total Revenue ($)', 'employee': 'Employee Name'},
+            color='total_revenue', color_continuous_scale='Greens',
+            title="Total Revenue per Employee"
+        )
+        st.plotly_chart(fig_emp, use_container_width=True)
+        
+    with col_table:
+        st.write("**Data Details:**")
+        st.dataframe(df_emp, use_container_width=True, hide_index=True)
+
+# --- MENU 5: INACTIVE CUSTOMERS ---
+elif menu == "🚨 Inactive Customers":
+    st.subheader("Inactive Customers (No Orders > 6 Months)")
+    st.write("List of customers at risk of churn that need to be re-engaged by the sales team.")
+    
+    st.dataframe(
+        df_inactive.style.highlight_null(color='#ffcccc', subset=['last_order']), 
+        use_container_width=True
+    )

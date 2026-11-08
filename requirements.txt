@@ -1,0 +1,4 @@
+python==3.15
+streamlit
+pandas
+plotly
